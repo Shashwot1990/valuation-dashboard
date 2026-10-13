@@ -376,6 +376,13 @@ AI_PASSWORD = secret("AI_PASSWORD")                # if set, visitors need it to
 AI_DAILY_LIMIT = int(secret("AI_DAILY_LIMIT", "25") or 25)  # max new analyses per day on your key
 DEFAULT_MODEL = secret("AI_MODEL", "claude-sonnet-5-5") or "claude-sonnet-5-5"
 HOSTED = secret("HOSTED", "").lower() in ("1", "true", "yes")  # hides local-only options online
+OWNER_PASSWORD = secret("OWNER_PASSWORD") or AI_PASSWORD  # unlocks the private "My watchlist" page
+MY_WATCHLIST = secret("MY_WATCHLIST")                      # your tickers; kept in secrets so they stay private
+PUBLIC_TICKERS = "MSFT\nNVDA\nAAPL\nGOOGL\nCOST\nKO\nAVGO\nBULL"
+
+
+def split_tickers(raw):
+    return list(dict.fromkeys(t.strip().upper() for t in raw.replace(",", "\n").split() if t.strip()))
 
 
 @st.cache_resource
@@ -529,11 +536,41 @@ def badge(read):
 
 # ---------------- sidebar ----------------
 
+PAGES = ["Public dashboard", "My watchlist 🔒"]
+
 with st.sidebar:
-    st.header("Tickers")
-    raw = st.text_area("One per line, or separated by commas",
-                       value="MSFT\nNVDA\nAAPL\nGOOGL\nCOST\nKO\nAVGO\nBULL", height=200)
-    tickers = list(dict.fromkeys(t.strip().upper() for t in raw.replace(",", "\n").split() if t.strip()))
+    # ?page=me in the URL opens the private page directly, so it can be bookmarked
+    page = st.radio("Page", PAGES, index=1 if st.query_params.get("page") == "me" else 0, key="page")
+    if page == PAGES[1]:
+        st.query_params["page"] = "me"
+    else:
+        st.query_params.pop("page", None)
+    private = page == PAGES[1]
+
+    if private:
+        unlocked = not OWNER_PASSWORD and not HOSTED  # no password needed only on your own computer
+        if OWNER_PASSWORD:
+            opw = st.text_input("Owner password", type="password", key="owner_pw")
+            unlocked = opw == OWNER_PASSWORD
+            if opw and not unlocked:
+                st.caption("Wrong password.")
+        elif HOSTED:
+            st.caption("Set OWNER_PASSWORD in Secrets to use this page online.")
+        if unlocked:
+            st.header("My watchlist")
+            raw = st.text_area("One per line, or separated by commas",
+                               value="\n".join(split_tickers(MY_WATCHLIST)), height=300, key="my_watchlist")
+            tickers = split_tickers(raw)
+            if tickers != split_tickers(MY_WATCHLIST):
+                st.caption("Changes last until you close the tab. To keep them, replace the "
+                           "MY_WATCHLIST line in your Secrets with:")
+                st.code(f'MY_WATCHLIST = "{", ".join(tickers)}"', language="toml")
+        else:
+            tickers = []
+    else:
+        st.header("Tickers")
+        raw = st.text_area("One per line, or separated by commas", value=PUBLIC_TICKERS, height=200)
+        tickers = split_tickers(raw)
     if st.button("Refresh data", width="stretch"):
         fetch.clear()
     st.caption("Data from Yahoo Finance, cached for 15 minutes.")
@@ -579,9 +616,12 @@ with st.sidebar:
                                  help="Any model you've pulled, e.g. `ollama pull llama3.1`.")
         ai_key = None
 
-st.title("Valuation Dashboard")
+st.title("My Watchlist" if private else "Valuation Dashboard")
 st.caption("P/E, forward P/E and PEG for every ticker, graded against the rule of thumb.")
 
+if private and not unlocked:
+    st.info("This page is private. Enter the owner password in the sidebar.")
+    st.stop()
 if not tickers:
     st.info("Add at least one ticker in the sidebar.")
     st.stop()

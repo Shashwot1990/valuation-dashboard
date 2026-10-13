@@ -31,6 +31,14 @@ and add your Anthropic API key (from platform.claude.com). That file is ignored 
 3. In **Advanced settings → Secrets**, paste the contents of `secrets.toml.example` with your real key and password.
 4. Deploy. You get a public link like `your-app.streamlit.app`.
 
+## Your private watchlist page
+
+The sidebar has two pages: **Public dashboard** (what visitors see) and **My watchlist 🔒**.
+Your watchlist lives in Secrets as `MY_WATCHLIST`, so it never appears in the public code, and the page
+needs `OWNER_PASSWORD` to open online. Bookmark it with `?page=me` at the end of your app URL.
+To add tickers, edit the box on the page. To keep them, update `MY_WATCHLIST` in Secrets
+(the page shows you the exact line to paste).
+
 ## Protecting your API credit
 
 - Your key lives only in Streamlit's Secrets, never in the code.
