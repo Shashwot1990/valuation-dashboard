@@ -1,0 +1,10 @@
+# Never upload your API key or password
+.streamlit/secrets.toml
+.env
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.csv
